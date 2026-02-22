@@ -1,0 +1,8 @@
+# Runtime artifacts
+runs/
+runtime/
+config/local.env
+
+# OS
+.DS_Store
+Thumbs.db

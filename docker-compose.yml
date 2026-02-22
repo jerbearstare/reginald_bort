@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  reginald_orchestrator:
+    image: python:3.11-slim
+    container_name: reginald_orchestrator
+    working_dir: /app
+    command: ["bash", "-lc", "python -m http.server 8787"]
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./runtime:/app/runtime
+      - ./runs:/app/runs
+    restart: unless-stopped
