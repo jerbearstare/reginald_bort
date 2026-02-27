@@ -88,13 +88,18 @@ if (-not (Test-Path $configPath)) {
 $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
 
 # Expected keys in pipeline_paths.json:
-# ingest_root, working_root, output_root, log_root
+# ingest_root, working_root, output_root, log_root, scene_project_root(optional)
 $workingRoot = $cfg.working_root
 $outputRoot  = $cfg.output_root
 $logRoot     = $cfg.log_root
+$sceneProjectRoot = $cfg.scene_project_root
 
 if (-not $workingRoot -or -not $outputRoot -or -not $logRoot) {
     throw "pipeline_paths.json must define working_root, output_root, log_root"
+}
+if (-not $sceneProjectRoot) {
+    # safe fallback so project stage can still run
+    $sceneProjectRoot = Join-Path $outputRoot "scene_projects"
 }
 
 # ---------- Job scaffold ----------
@@ -104,10 +109,12 @@ $jobId = "$jobPrefix-$timestamp"
 $workDir = Join-Path $workingRoot $jobId
 $jobLogDir = Join-Path $logRoot $jobId
 $jobOutDir = Join-Path $outputRoot $jobId
+$sceneProjectDir = Join-Path $sceneProjectRoot $jobId
 
-New-Item -ItemType Directory -Force -Path $workDir   | Out-Null
-New-Item -ItemType Directory -Force -Path $jobLogDir | Out-Null
-New-Item -ItemType Directory -Force -Path $jobOutDir | Out-Null
+New-Item -ItemType Directory -Force -Path $workDir         | Out-Null
+New-Item -ItemType Directory -Force -Path $jobLogDir       | Out-Null
+New-Item -ItemType Directory -Force -Path $jobOutDir       | Out-Null
+New-Item -ItemType Directory -Force -Path $sceneProjectDir | Out-Null
 
 $statusPath = Join-Path $jobLogDir "status.json"
 
@@ -123,6 +130,7 @@ $status = @{
     work_dir = $workDir
     log_dir = $jobLogDir
     output_dir = $jobOutDir
+    scene_project_dir = $sceneProjectDir
     checkpoints = @()
 }
 
@@ -132,9 +140,33 @@ Write-Host "[OK] Job created: $jobId"
 Write-Host "[OK] Work dir: $workDir"
 Write-Host "[OK] Log dir : $jobLogDir"
 
-# ---------- Stage 1: project_creation_stub ----------
-Write-StageStatus -Stage "project_creation_stub_done"
-$status.checkpoints += "project_creation_stub_done"
+# ---------- Stage 1: project_creation (real folder + marker) ----------
+$projectReadme = Join-Path $sceneProjectDir "PROJECT_CREATE_IN_SCENE.txt"
+@"
+Reginald Project Creation Gate
+
+Job ID: $jobId
+Scene project directory: $sceneProjectDir
+
+Action required:
+1) Open FARO SCENE
+2) Create a NEW project for this job inside this directory
+3) Save the project in this folder
+
+Verification:
+- Any Scene project file in this folder (*.lsproj, *.flsproj, *.fws)
+"@ | Set-Content -Path $projectReadme -Encoding UTF8
+
+$existingProjectFiles = Get-ChildItem -Path $sceneProjectDir -File -Include *.lsproj,*.flsproj,*.fws -ErrorAction SilentlyContinue
+if ($existingProjectFiles) {
+    Write-StageStatus -Stage "project_creation_done" -Extra @{ scene_project_file = $existingProjectFiles[0].FullName }
+    $status.checkpoints += "project_creation_done"
+} else {
+    Write-StageStatus -Stage "project_creation_pending" -Result "pending_validation" -ReasonCode "awaiting_scene_project_create" -Extra @{ project_instruction = $projectReadme }
+    Write-Host "[HUMAN CHECKPOINT] Create/save Scene project in: $sceneProjectDir"
+    Write-Host "[HUMAN CHECKPOINT] Then rerun this command to continue."
+    exit 0
+}
 
 # ---------- Stage 2: processing_data_stub (extract zip) ----------
 try {
