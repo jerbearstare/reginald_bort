@@ -182,16 +182,42 @@ if ($existingProjectFiles.Count -gt 0) {
     exit 0
 }
 
-# ---------- Stage 2: processing_data_stub (extract zip) ----------
+# ---------- Stage 2: processing_data (extract + manifest) ----------
 try {
     $extractDir = Join-Path $workDir "extracted"
     New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
     Expand-Archive -Path $ZipPath -DestinationPath $extractDir -Force
-    Write-StageStatus -Stage "processing_data_stub_done" -Extra @{ extracted_to = $extractDir }
-    $status.checkpoints += "processing_data_stub_done"
+
+    $extractedFiles = Get-ChildItem -Path $extractDir -Recurse -File -ErrorAction SilentlyContinue
+    if (-not $extractedFiles -or $extractedFiles.Count -eq 0) {
+        Fail-And-Exit -Stage "processing_data_done" -ReasonCode "extract_empty" -Message "Extraction completed but no files were found in $extractDir"
+    }
+
+    $topFolders = Get-ChildItem -Path $extractDir -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+    $extSample = $extractedFiles |
+        Group-Object Extension |
+        Sort-Object Count -Descending |
+        Select-Object -First 12 |
+        ForEach-Object { @{ extension = ($_.Name); count = $_.Count } }
+
+    $manifestPath = Join-Path $jobOutDir "processing_manifest.json"
+    $manifest = @{
+        job_id = $jobId
+        created_at = (Get-Date).ToString("s")
+        zip_path = $ZipPath
+        extract_dir = $extractDir
+        file_count = $extractedFiles.Count
+        total_bytes = ($extractedFiles | Measure-Object Length -Sum).Sum
+        top_level_folders = @($topFolders)
+        extension_summary = @($extSample)
+    }
+    $manifest | ConvertTo-Json -Depth 10 | Set-Content -Path $manifestPath -Encoding UTF8
+
+    Write-StageStatus -Stage "processing_data_done" -Extra @{ extracted_to = $extractDir; processing_manifest = $manifestPath; extracted_file_count = $extractedFiles.Count }
+    $status.checkpoints += "processing_data_done"
 }
 catch {
-    Fail-And-Exit -Stage "processing_data_stub_done" -ReasonCode "zip_extract_failed" -Message $_.Exception.Message
+    Fail-And-Exit -Stage "processing_data_done" -ReasonCode "zip_extract_failed" -Message $_.Exception.Message
 }
 
 # ---------- Stage 3: data_clean_stub ----------
