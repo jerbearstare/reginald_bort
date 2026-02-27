@@ -168,8 +168,11 @@ Verification:
 - Any Scene project file in this folder (*.lsproj, *.flsproj, *.fws)
 "@ | Set-Content -Path $projectReadme -Encoding UTF8
 
-$existingProjectFiles = Get-ChildItem -Path $sceneProjectDir -File -Include *.lsproj,*.flsproj,*.fws -ErrorAction SilentlyContinue
-if ($existingProjectFiles) {
+$existingProjectFiles = @()
+$existingProjectFiles += Get-ChildItem -Path $sceneProjectDir -File -Filter *.lsproj -Recurse -ErrorAction SilentlyContinue
+$existingProjectFiles += Get-ChildItem -Path $sceneProjectDir -File -Filter *.flsproj -Recurse -ErrorAction SilentlyContinue
+$existingProjectFiles += Get-ChildItem -Path $sceneProjectDir -File -Filter *.fws -Recurse -ErrorAction SilentlyContinue
+if ($existingProjectFiles.Count -gt 0) {
     Write-StageStatus -Stage "project_creation_done" -Extra @{ scene_project_file = $existingProjectFiles[0].FullName }
     $status.checkpoints += "project_creation_done"
 } else {
