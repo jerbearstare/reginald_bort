@@ -2,6 +2,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ZipPath,
 
+    # Optional resume job id (re-enter a pending job instead of creating a new one)
+    [string]$JobId,
+
     # Use this switch to continue past the early human gate
     [switch]$ApproveDataClean,
 
@@ -103,8 +106,12 @@ if (-not $sceneProjectRoot) {
 }
 
 # ---------- Job scaffold ----------
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$jobId = "$jobPrefix-$timestamp"
+if (-not $JobId -or [string]::IsNullOrWhiteSpace($JobId)) {
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $jobId = "$jobPrefix-$timestamp"
+} else {
+    $jobId = $JobId
+}
 
 $workDir = Join-Path $workingRoot $jobId
 $jobLogDir = Join-Path $logRoot $jobId
@@ -136,7 +143,11 @@ $status = @{
 
 $status | ConvertTo-Json -Depth 10 | Set-Content -Path $statusPath -Encoding UTF8
 
-Write-Host "[OK] Job created: $jobId"
+if ($PSBoundParameters.ContainsKey('JobId')) {
+    Write-Host "[OK] Job resumed: $jobId"
+} else {
+    Write-Host "[OK] Job created: $jobId"
+}
 Write-Host "[OK] Work dir: $workDir"
 Write-Host "[OK] Log dir : $jobLogDir"
 
@@ -164,7 +175,7 @@ if ($existingProjectFiles) {
 } else {
     Write-StageStatus -Stage "project_creation_pending" -Result "pending_validation" -ReasonCode "awaiting_scene_project_create" -Extra @{ project_instruction = $projectReadme }
     Write-Host "[HUMAN CHECKPOINT] Create/save Scene project in: $sceneProjectDir"
-    Write-Host "[HUMAN CHECKPOINT] Then rerun this command to continue."
+    Write-Host "[HUMAN CHECKPOINT] Then rerun with -JobId $jobId to continue this same job."
     exit 0
 }
 
