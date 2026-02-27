@@ -1,6 +1,6 @@
-# Reginald_bort
+# Reginald_Bortholomew aka Reg_Bort
 
-Auto-registration orchestration system for FARO Scene workflows.
+Auto Data registiration bot for FARO laser scanning based registration workflows. 
 
 ## Vision
 Reginald_bort monitors incoming RAW scan uploads, runs a registration pipeline, performs QA checks, and publishes processed outputs + notes.
@@ -11,15 +11,14 @@ Reginald_bort monitors incoming RAW scan uploads, runs a registration pipeline, 
 - Preprocess scans
 - Run registration
 - Generate QA slices/screens
-- Human pass/fail gate
+- Human pass/fail gate, update in GUI, Rotation ETC
 - Post-process + export (RCS + notes)
 - Project closeout upload + summary
-
 ## Core Agents
 - Overseer
 - Project Agent
 - Registration Agent
-- Checking Agent (human-in-the-loop)
+- Checking Agent/ML Using the QC image reports.  (human-in-the-loop)
 
 ## Current Build Status
 - Hybrid architecture validated on work PC: Docker orchestration + native FARO Scene execution.
