@@ -29,7 +29,23 @@ function Write-StageStatus {
         $status[$k] = $Extra[$k]
     }
 
-    $status | ConvertTo-Json -Depth 10 | Set-Content -Path $statusPath -Encoding UTF8
+    $json = $status | ConvertTo-Json -Depth 10
+    $tmpPath = "$statusPath.tmp"
+    $written = $false
+    for ($i = 0; $i -lt 12; $i++) {
+        try {
+            Set-Content -Path $tmpPath -Value $json -Encoding UTF8 -ErrorAction Stop
+            Move-Item -Path $tmpPath -Destination $statusPath -Force -ErrorAction Stop
+            $written = $true
+            break
+        } catch {
+            Start-Sleep -Milliseconds 300
+        }
+    }
+    if (-not $written) {
+        throw "Could not write status file after retries: $statusPath"
+    }
+
     Write-Host "[STATUS] $Stage ($Result)"
 }
 
